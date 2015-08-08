@@ -11,13 +11,47 @@ ROUNDCUBE="https://courrier.example.org/roundcube/"
 
 if [ -n "$1" ] ; then
 
-  URI="$( echo "$1" | sed "/^mailto://" )"
+  MAILTO="$( echo "$1" | sed -e "s/^mailto://" )"
 
-  TO="$(      echo "{URI}" | gawk -v RS="[?=&]" '{ print $1 }'  )"
-  SUBJECT="$( echo "{URI}" | gawk -v RS="[?=&]" -v IGNORECASE=1 '{ for( I=2 ; I <= NF ; I+= 2 ){ if ( $I ~ /^subject$/ ) { print $(I+1) } } }'  )"
-  BODY="$(    echo "{URI}" | gawk -v RS="[?=&]" -v IGNORECASE=1 '{ for( I=2 ; I <= NF ; I+= 2 ){ if ( $I ~ /^body$/    ) { print $(I+1) } } }'  )"
+  URL="$( echo "${MAILTO}" | gawk -v FS="[?=&]" '
 
-  "${BROWSER}" "${ROUNDCUBE}?_task=mail&_action=compose&_to=$TO&_subject=$SUBJECT&_message=$BODY"
+  BEGIN {
+    URL = "?_task=mail&_action=compose"
+    RS="============"
+  }
+  {
+    # Suppression des espaces
+    gsub( /(\r\n| )/, "" )
+
+    # Ajout du destinataire
+    if ( $1 ) { VALEUR["to"] = $1 }
+
+    # Lecture des autres en-têtes
+    for( I=2 ; I <= NF ; I+= 2 ){
+      if ( ( tolower($I)  == "to" ) && ( "to" in VALEUR ) ){
+	VALEUR["to] = VALEUR["to] "," $(I+1)
+      } else {
+        VALEUR[ tolower($I) ] = $(I+1)
+      }
+    }
+
+    # Création du lien
+    if ( "to" in VALEUR ) {
+      URL = URL "&_to=" VALEUR["to"]
+    }
+    if ( "cc" in VALEUR ) {
+      URL = URL "&_cc=" VALEUR["cc"]
+    }
+    if ( "subject" in VALEUR ) {
+      URL = URL "&_subject=" VALEUR["subject"]
+    }
+    if ( "body" in VALEUR ) {
+      URL = URL "&_body=" VALEUR["body"]
+    }
+    print URL
+  }' )"
+
+  "${BROWSER}" "${ROUNDCUBE}${URL}"
 
 else
 
